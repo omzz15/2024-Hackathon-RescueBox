@@ -34,7 +34,6 @@ def create_cluster_settings_task_schema() -> TaskSchema:
 def transform_case(inputs: ClusterSettingsInputs, parameters: ClusterSettingsParameters) -> ResponseBody:
     
 
-
     return ResponseBody(root=TextResponse(value="hello"))
 
 if __name__ == '__main__':
