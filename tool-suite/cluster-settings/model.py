@@ -1,20 +1,24 @@
 import glob
 from PIL import Image
-from torchvision import transforms
-import torch
-import numpy
-import cv2
+from ultralytics import YOLO  
+import json
+import hashlib
+from os import path
+
+class Box:
+    def __init__(self, cls: int | float, conf : float, data: list[float], xywh: list[float]):
+        self.cls = int(cls)
+        self.conf = conf
+        self.data = data
+        self.xywh = xywh
 
 class ClusterSettingModel:
-    def __init__(self):
-        import torch
-        self.model = torch.hub.load('pytorch/vision:v0.10.0', 'deeplabv3_resnet50', pretrained=True)
-        self.model.eval()
+    def __init__(self, model = "yolo11n.pt"):
+        self.model_name = model
+        self.model = YOLO(model)
 
     def get_image_files(self, directory: str) -> list[str]:
-        # TODO maybe do this without loading all images?
-        print(f"Loading images from {directory}...")
-        files = glob.glob(directory + "/**/*")
+        files = glob.glob(directory + "/**/*", recursive=True)
         images = []
         for file in files:
             try:
@@ -22,39 +26,45 @@ class ClusterSettingModel:
                     f.verify()
                 images.append(file)
             except:
-                print(f"Unable to open {file} as image")
-
-        print(f"Done loading images")
+                pass
 
         return images
 
-    def remove_human(self, img_path: str) -> None:
-        input_image = Image.open(img_path)
-        input_image = input_image.convert("RGB")
+    def find_objects(self, img_path: str, save_path: str | None = None) -> dict[str, str | list]:
+        with open(img_path, 'rb') as f:
+            sha_hash = hashlib.sha256(f.read()).hexdigest()
+        
+        result = self.model(img_path)
+        result = result[0].boxes
 
-        preprocess = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ])
+        boxes = []
+        for box in zip(result.cls, result.conf, result.data, result.xywh):
+            no_tensor_data = []
+            for data in box:
+                no_tensor_data.append(data.cpu().numpy().tolist())
+            boxes.append(Box(*no_tensor_data).__dict__)
+        
+        json_data = {
+            "file": path.abspath(img_path),
+            "hash": sha_hash,
+            "model": self.model_name,
+            "boxes": boxes 
+        }
 
-        input_tensor = preprocess(input_image)
-        input_batch = input_tensor.unsqueeze(0)
+        if(save_path):
+            with open(save_path, 'w') as f:
+                json.dump(json_data, f)
 
-        with torch.no_grad():
-            output = self.model(input_batch)['out'][0]
-        output_predictions = output.argmax(0)
+        return json_data
+    
 
-        # # create a color pallette, selecting a color for each class
-        palette = torch.tensor([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
-        colors = torch.as_tensor([i for i in range(21)])[:, None] * palette
-        colors = (colors % 255).numpy().astype("uint8")
-
-        # # plot the semantic segmentation predictions of 21 classes in each color
-        r = Image.fromarray(output_predictions.byte().cpu().numpy()).resize(input_image.size)
-        r.putpalette(colors)
-
-        open_cv_image = numpy.array(r)
-        cv2.imshow("img", open_cv_image)
-        cv2.imshow("img2", open_cv_image)
-
-
+    def batch_find_objects(self, img_dir: str, save_path: str | None = None) -> None:
+        images = self.get_image_files(img_dir)
+        json_data = {
+            "directory": path.abspath(img_dir),
+            "images": [self.find_objects(img) for img in images]
+        }
+        
+        if(save_path):
+            with open(save_path, 'w') as f:
+                json.dump(json_data, f)

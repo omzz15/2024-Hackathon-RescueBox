@@ -1,6 +1,4 @@
 from model import ClusterSettingModel
 
 model = ClusterSettingModel()
-model.remove_human("deeplab1.png")
-
-input("enter to quit")
+model.batch_find_objects("test", "test/output.json")
