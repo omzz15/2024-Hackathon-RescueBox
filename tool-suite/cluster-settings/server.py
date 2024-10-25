@@ -1,6 +1,8 @@
 from typing import TypedDict
 from flask_ml.flask_ml_server import MLServer
 from flask_ml.flask_ml_server.models import *
+import glob
+import cv2
 
 server = MLServer(__name__)
 
@@ -30,9 +32,8 @@ def create_cluster_settings_task_schema() -> TaskSchema:
 )
 
 def transform_case(inputs: ClusterSettingsInputs, parameters: ClusterSettingsParameters) -> ResponseBody:
-    print(inputs)
+    
 
-    inputs["images_path"].path
 
     return ResponseBody(root=TextResponse(value="hello"))
 

@@ -1,24 +1,29 @@
+import glob
 from pathlib import Path
 from typing import Optional
+import cv2
 
-class AudioTranscriptionModel:
-    def __init__(self, model_path: str = "base"):
-        import whisper
-        self.model = whisper.load_model(model_path)
-        self.audio_extensions = {".mp3", ".wav", ".flac", ".aac", ".ogg", ".m4a"}
+class ClusterSettingModel:
+    def __init__(self):
+        import inference
+        self.model = inference.get_model(model_id="yolov8n-seg-640")
 
-    def get_audio_files(self, directory: str) -> list[Path]:
-        audio_files: list[Path] = []
+    def get_image_files(self, directory: str) -> dict[Path, cv2.Mat]:
+        
+        # TODO maybe do this without loading all images?
+        print(f"Loading images from {directory}...")
+        files = glob.glob(directory + "/**/*")
+        images = {}
+        for file in files:
+            try:
+                img = cv2.imread(file)
+                images[Path(file)] = img
+            except:
+                print(f"Unable to open {file} as image")
 
-        # Convert string path to Path object
-        directory_path = Path(directory)
+        print(f"Done loading images")
 
-        # Iterate over files in directory and subdirectories
-        for file_path in directory_path.rglob("*"):
-            if file_path.suffix.lower() in self.audio_extensions:
-                audio_files.append(file_path)
-
-        return audio_files
+        return images
 
     def _validate_audio_path(self, audio_path: str) -> None:
         if audio_path is None:
